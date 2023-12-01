@@ -92,6 +92,12 @@ y_train = np.load(f'{train_folder}/y_train.npy', allow_pickle=True)
 with open(vocabulary_file, 'r') as file:
     vocabulary = json.load(file)
 
+with open(vocabulary_file, 'r') as file:
+    vocabulary = json.load(file)
+selected_features_indices = list(vocabulary.values())
+
+transformed_train = X_train[:, selected_features_indices]
+
 param_grid = {
     'classification__ram': list(range(binarization__thermometer, 64, binarization__thermometer))
 }

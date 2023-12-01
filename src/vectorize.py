@@ -3,19 +3,20 @@ import json
 from scipy.sparse import save_npz
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+column_text = 'ABSTRACT'
 
 def vectorize_tfidf(df):
-    if 'text' in df.columns:
+    if column_text in df.columns:
         tfidf_vectorizer = TfidfVectorizer()
-        tfidf_matrix = tfidf_vectorizer.fit_transform(df['text'])
+        tfidf_matrix = tfidf_vectorizer.fit_transform(df[column_text])
         return tfidf_vectorizer.vocabulary_, tfidf_matrix
     else:
-        raise ValueError("A coluna 'text' não está presente no DataFrame.")
+        raise ValueError(f"A coluna {column_text} não está presente no DataFrame.")
 
 # Localização dos arquivos
-origin_csv_file = '/home/gssilva/datasets/atribuna-site/full/processed_Atribuna.csv'
-output_file_name = '/home/gssilva/datasets/atribuna-site/full/vectorized_aTribuna_full.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-site/full/vocabulary.json'
+origin_csv_file = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
+output_file_name = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary.json'
 
 # Leitura do arquivo CSV
 df = pd.read_csv(origin_csv_file)

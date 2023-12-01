@@ -82,22 +82,22 @@ def most_distants_docs():
     return vstack(most_distant_docs), labels_output, indices_output
 
 # Carregando dados e rótulos
-vectorized_file = '/home/gssilva/datasets/atribuna-site/full/vectorized_aTribuna_full.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-site/full/vocabulary.json'
-output_folder = '/home/gssilva/datasets/atribuna-site/full/selections/'
-min_inclass = 0.65
+vectorized_file = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary.json'
+output_folder = '/home/gssilva/datasets/atribuna-elias/full/selection'
+min_inclass = 0.60
 max_inclass = 1.05
-min_outclass = 0.25
-max_outclass = 0.40
-path_file_labels = '/home/gssilva/datasets/atribuna-site/full/processed_Atribuna.csv'
-train_folder = '/home/gssilva/datasets/atribuna-site/full/train_test/'
-labels_column = 'class'
-centroid_cal = True
-distants = True
+min_outclass = 0.20
+max_outclass = 0.45
+path_file_labels = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
+train_folder = '/home/gssilva/datasets/atribuna-elias/full/train-test'
+labels_column = 'LABEL'
+centroid_cal = False
+distants = False
 
 vectorized = load_npz(vectorized_file)
 df = pd.read_csv(path_file_labels)
-labels = df[labels_column].to_numpy()  # Convertendo para NumPy array
+labels = df[labels_column].to_numpy()  # Convertendo para NumPy array3
 labels_uniq = set(labels)
 
 with open(vocabulary_file, 'r') as file:
@@ -135,6 +135,6 @@ print("Divisão Treino e Teste realizada!")
 for i in np.arange(min_inclass, max_inclass, 0.05):  # Ajuste o passo conforme necessário
     for j in np.arange(min_outclass, max_outclass, 0.05):  # Ajuste o passo conforme necessário
         _, __, new_vocabulary = select_features_parallel(X_train, y_train, vocabulary, i, j)
-        file_name = f'{output_folder}/vocabulary_{i:.2f}-{j:.2f}.json'.replace("'", "")
+        file_name = f'{output_folder}/vocabulary_{i:.2f}-{j:.2f}_not_centroid.json'.replace("'", "")
         with open(file_name, 'w') as file:
             json.dump(new_vocabulary, file, indent=4)

@@ -33,8 +33,9 @@ def clean_and_stem_text(text):
     return ' '.join(stemmed_words) if stemmed_words else text
 
 def clean_and_stem_text_parallel(texts, num_workers=4):
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        results = list(executor.map(clean_and_stem_text, texts))
+    results = []
+    for text in texts:
+        results.append(clean_and_stem_text(text))
     return results
 
 
@@ -54,10 +55,10 @@ def clean_and_stem_text_parallel(texts, num_workers=4):
 #     args = parser.parse_args()
 
 #modifica as configurações padrão considerando as configurações passadas pelo usuário
-origin_csv_file = '/home/gssilva/datasets/atribuna-elias/aTribuna.csv'
-output_file_name = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna.csv'
+origin_csv_file = '/home/gssilva/datasets/atribuna-elias/aTribuna-Elias.csv'
+output_file_name = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
 n_procs= 30
-column_text = 'ABSTRACT'
+column_text = "ABSTRACT"
 
 # with open(origin_csv_file, "r", encoding="iso-8859-1") as rdb:
 #     data = [
@@ -69,7 +70,7 @@ column_text = 'ABSTRACT'
 # proporc = n_texts_documents/len(df)
 # df_reduced = df.groupby('coluna_estratificada').apply(lambda x: x.sample(frac=proporc)).reset_index(drop=True)
 
-df = pd.read_csv(origin_csv_file, encoding="iso-8859-1", delimiter=';')
+df = pd.read_csv(origin_csv_file, encoding="iso-8859-1")
 print("dataset was colected!")
 
 df[column_text] = clean_and_stem_text_parallel(df[column_text], n_procs)

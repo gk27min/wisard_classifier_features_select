@@ -8,6 +8,13 @@ import pandas as pd
 import json
 from scipy.sparse import load_npz
 
+def divisors_and_multiples(n, max_value):
+    divisors = [i for i in range(4, max_value + 1) if n % i == 0]
+    multiples = [i for i in range(n, max_value + 1, n)]
+    combined = list(set(divisors + multiples))  # Combina e remove duplicatas
+    combined.sort()  # Ordena a lista
+    return combined
+
 def split_train_test(tfidf_matrix, labels, test_size=0.25, random_state=42):
     X_train, X_test, y_train, y_test = train_test_split(tfidf_matrix, labels, stratify=labels, test_size=test_size, random_state=random_state)
     return X_train, X_test, y_train, y_test
@@ -31,10 +38,11 @@ def binarize_vectorized(thermometer, X):
     return binX
 
 def objective_wisard(trial):
-    thermometer = trial.suggest_int('thermometer', 4, 64)
+    thermometer = trial.suggest_int('thermometer', 4, 128)
+    # ram = trial.suggest_int('ram', 4, 64)
 
-    max_ram = 64 - (64 % thermometer)  # Ajusta o máximo para ser divisível pelo valor de 'thermometer'
-    ram = trial.suggest_int('ram', thermometer, max_ram, step=thermometer)
+    possible_values_for_ram = divisors_and_multiples(thermometer, 64)
+    ram = trial.suggest_int('ram', possible_values_for_ram)
 
     params = {
         'thermometer': thermometer,
@@ -52,7 +60,7 @@ def objective_wisard(trial):
     ds_train = wsd.DataSet(X_train, y_train)
     ds_val = wsd.DataSet(X_val, y_val)
 
-    model = wsd.Wisard(params['ram'])
+    model = wsd.ClusWisard(params['ram'], 0.2, 1000, 10)
     model.train(ds_train)
     predicted = model.classify(ds_val)
 
@@ -64,7 +72,7 @@ def objective_wisard(trial):
 
     return average_score
 
-OPTUNA_EARLY_STOPING = 250  # number of stagnation iterations required to raise an EarlyStoppingExceeded exception
+OPTUNA_EARLY_STOPING = 150  # number of stagnation iterations required to raise an EarlyStoppingExceeded exception
 
 class EarlyStoppingExceeded(optuna.exceptions.OptunaError):
     early_stop = OPTUNA_EARLY_STOPING
@@ -91,13 +99,13 @@ def early_stopping_opt(study, trial):
 
 
 #modifica as configurações padrão considerando as configurações passadas pelo usuário
-vocabulary_file = '/home/gssilva/datasets/atribuna-site/full/selections/vocabulary_0.60-0.20.json'
-train_folder = '/home/gssilva/datasets/atribuna-site/full/train_test'
-output_file_name = '/home/gssilva/datasets/atribuna-site/full/results/otimizacao_optuna.csv'
-min_inclass = 0.6
-max_outclass = 0.2
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/selection/vocabulary_0.60-0.20_not_centroid.json'
+train_folder = '/home/gssilva/datasets/atribuna-elias/full/train-test'
+output_file_name = '/home/gssilva/datasets/atribuna-elias/full/results/otimizacao_optuna_full_base_TPE.csv'
+min_inclass = 0.60
+max_outclass = 0.20
 n_trials = 50
-n_procs = 15
+n_procs = 80
 
 X_train = load_npz(f'{train_folder}/X_train.npz')
 X_train = X_train.tocsc()
@@ -110,7 +118,12 @@ selected_features_indices = list(vocabulary.values())
 # Selecionar características com base no vocabulário
 transformed_train = X_train[:, selected_features_indices]
 
-sampler = optuna.samplers.TPESampler(seed=42)
+params = {
+    'thermometer': list(range(4, 128, 4)),
+    'ram': list(range(4, 64, 4))
+}
+
+sampler = optuna.samplers.TPESampler(seed=42, n_startup_trials=100)
 pruner = optuna.pruners.HyperbandPruner()
 
 study_wisard = optuna.create_study(direction='maximize', sampler=sampler, pruner=pruner)
