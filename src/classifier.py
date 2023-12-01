@@ -4,9 +4,11 @@ import wisardpkg as wsd
 import pandas as pd
 import numpy as np
 import scipy.sparse
-from scipy.sparse import load_npz, save_npz, csr_matrix, vstack
+import matplotlib.pyplot as plt
+from scipy.sparse import load_npz, csr_matrix, vstack
 from scipy.sparse import vstack
 from sklearn.metrics.pairwise import cosine_distances
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, hamming_loss
 
 random_state = 42
@@ -185,11 +187,41 @@ def evaluate_classification(predicted, expected):
 
     return results
 
+def generate_heatmap(data, file_name):
+    """
+    Generates a heatmap of the average directional vectors for each category
+    and saves it to a file.
 
+    :param data: Dictionary with categories as keys and lists of vectors as values.
+    :param file_name: The name of the file to save the heatmap image.
+    """
+    # Calculating the average directional vector for each category
+    mean_vectors = {category: np.mean(np.array(vectors), axis=0) for category, vectors in data.items()}
+
+    # Converting the average vectors into a matrix for the heatmap
+    mean_activation_matrix = np.array(list(mean_vectors.values()))
+
+    # Creating the heatmap
+    plt.figure(figsize=(10, 6))
+    plt.imshow(mean_activation_matrix, cmap='coolwarm', aspect='auto')
+    plt.colorbar(label='Average Activation Level')
+
+    # Adding labels for categories
+    plt.yticks(ticks=range(len(mean_vectors)), labels=mean_vectors.keys())
+    plt.xticks(ticks=range(len(next(iter(mean_vectors.values())))), labels=range(1, len(next(iter(mean_vectors.values()))) + 1))
+
+    plt.title('Heatmap of Average Directional Vector by Category')
+    plt.xlabel('Position in Vector')
+    plt.ylabel('Category')
+
+    # Saving the heatmap to a file
+    plt.savefig(file_name)
+    plt.close()
 
 vectorized_file = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary.json'
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/selection/vocabulary_0.60-0.20_not_centroid.json'
 path_file_labels = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
+output_img = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/full_discriminators.png'
 
 vectorized = load_npz(vectorized_file)
 df = pd.read_csv(path_file_labels)
@@ -202,7 +234,9 @@ selected_features = list(vocabulary.values())
 
 vectorized = vectorized[:, selected_features]
 
-params = {'thermometer': 0,'ram': 0}
+print('Getting all inicial files and selecting all features...')
+
+params = {'thermometer': 62,'ram': 62}
 
 if centroid_cal:
     centroids, labels_centroids = centroid_calc()
@@ -216,8 +250,11 @@ if most_close:
     _, _, indices = most_close_docs()
     fixed_train.extend(indices)
 
+print('Centroid, most distants, most close documents calculate...')
+
 bin_x = binarize_vectorized(params['thermometer'], vectorized)
 bin_train, bin_test, y_train, y_test = split_train_test(bin_x, labels, 0.25, fixed_train)
+print('binarized and split all data done...')
 
 if centroid_cal:
     bin_train = vstack(bin_x, centroids_bin)
@@ -226,8 +263,12 @@ if centroid_cal:
 ds_train = wsd.DataSet(bin_train, y_train)
 ds_test = wsd.DataSet(bin_test, y_test)
 
-model = wsd.Wisard(params['ram'])
+model = wsd.ClusWisard(params['ram'], 0.2, 100, 5)
 model.train(ds_train)
+
+discriminators = model.getMentalImages()
+generate_heatmap(discriminators, output_img)
+
 predicted = model.classify(ds_test)
 
 score = evaluate_classification
