@@ -106,7 +106,7 @@ def objective_wisard(trial):
 
     return average_score
 
-OPTUNA_EARLY_STOPING = 250  # number of stagnation iterations required to raise an EarlyStoppingExceeded exception
+OPTUNA_EARLY_STOPING = 50  # number of stagnation iterations required to raise an EarlyStoppingExceeded exception
 
 class EarlyStoppingExceeded(optuna.exceptions.OptunaError):
     early_stop = OPTUNA_EARLY_STOPING

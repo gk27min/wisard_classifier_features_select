@@ -31,7 +31,7 @@ def select_train_base(labels, matrix):
     for label, num_docs in zip(labels_unique, counts):
         # Define a porcentagem de treino baseada no número de documentos
         if num_docs < 300:
-            percent_train = 0.95
+            percent_train = 0.70
         elif num_docs < 500:
             percent_train = 0.70
         elif num_docs < 1000:
@@ -261,6 +261,8 @@ params = {'thermometer': 62,'ram': 62}
 if centroid_cal:
     centroids, labels_centroids = centroid_calc()
     centroids_bin = binarize_vectorized(params['thermometer'], centroids)
+    vectorized.extend(centroids_bin)
+    labels.extend(labels_centroids)
     print('Centroids calculate')
 
 if most_dist:
@@ -296,15 +298,11 @@ bin_x = binarize_vectorized(params['thermometer'], vectorized_reduced)
 bin_train, bin_test, y_train, y_test = select_train_base(labels, bin_x)
 print('binarized and split all data done...')
 
-if centroid_cal:
-    bin_train.extend(centroids_bin)
-    y_train.extend(labels_centroids)
-
 ds_train = wsd.DataSet(bin_train, y_train)
 ds_test = wsd.DataSet(bin_test, y_test)
 print('Dataset Wisard Concluide...')
 
-model = wsd.ClusWisard(params['ram'], 0.4, 200, 5)
+model = wsd.ClusWisard(params['ram'], 0.2, 100, 5)
 model.train(ds_train)
 print('Training model concluide...')
 
