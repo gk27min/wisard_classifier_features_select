@@ -2,14 +2,52 @@ import numpy as np
 import wisardpkg as wsd
 import scipy.sparse
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import f1_score
 import optuna
-import pandas as pd
-import json
 from scipy.sparse import load_npz
+from sklearn.utils.extmath import randomized_svd
+import random
+
+random.seed(42)
 
 def split_train_test(tfidf_matrix, labels, test_size=0.25, random_state=42):
     X_train, X_test, y_train, y_test = train_test_split(tfidf_matrix, labels, stratify=labels, test_size=test_size, random_state=random_state)
+    return X_train, X_test, y_train, y_test
+
+def select_train_base(labels, matrix):
+    indices_train = []
+    indices_test = []
+    labels_unique, counts = np.unique(labels, return_counts=True)
+
+    for label, num_docs in zip(labels_unique, counts):
+        # Define a porcentagem de treino baseada no número de documentos
+        if num_docs < 300:
+            percent_train = 0.95
+        elif num_docs < 500:
+            percent_train = 0.70
+        elif num_docs < 1000:
+            percent_train = 0.85
+        elif num_docs < 2000:
+            percent_train = 0.75
+        else:
+            percent_train = 0.60
+        
+        # Encontra os índices para a classe atual
+        class_indices = np.where(labels == label)[0]
+
+        # Divide os índices para treino e teste
+        train_indices, test_indices = train_test_split(class_indices, train_size=percent_train)
+        
+        indices_train.extend(train_indices)
+        indices_test.extend(test_indices)
+
+    X_train = [matrix[i] for i in indices_train]
+    X_test = [matrix[i] for i in indices_test]
+
+    y_train = [labels[i] for i in indices_train]
+    y_test = [labels[i] for i in indices_test]
+
+
     return X_train, X_test, y_train, y_test
 
 def binarize_vectorized(thermometer, X):
@@ -35,32 +73,36 @@ def objective_wisard(trial):
 
     max_ram = 64 - (64 % thermometer)  # Ajusta o máximo para ser divisível pelo valor de 'thermometer'
     ram = trial.suggest_int('ram', thermometer, max_ram, step=thermometer)
+    min_score = trial.suggest_float('min_score', 0, 1, step=0.1)
+    threshold = trial.suggest_int('threshold', 100, 1000, 100)
 
     params = {
         'thermometer': thermometer,
         'ram': ram,
-        'random_state': 42
+        'random_state': 42,
+        'min_score': min_score,
+        'threshold': threshold
     }
 
     # Binarização tanto para treino quanto para validação
     BinX = binarize_vectorized(params['thermometer'], transformed_train)
 
     # Divisão de treino e validação
-    X_train, X_val, y_train, y_val = split_train_test(BinX, labels, 0.25, params['random_state'])
+    X_train, X_val, y_train, y_val = select_train_base(labels, BinX)
 
     # Preparação e treinamento do modelo WiSARD
     ds_train = wsd.DataSet(X_train, y_train)
     ds_val = wsd.DataSet(X_val, y_val)
 
-    model = wsd.ClusWisard(params['ram'], 0.2, 100, 5)
+    model = wsd.ClusWisard(params['ram'], params['min_score'], params['threshold'], 5)
     model.train(ds_train)
     predicted = model.classify(ds_val)
 
     # Cálculo da acurácia
-    average_score = accuracy_score(y_val, predicted)
+    average_score = f1_score(y_val, predicted,average='macro')
 
     # Log apenas da acurácia e dos parâmetros atuais
-    print(f'Parâmetros: {params}, Acurácia: {average_score}')
+    # print(f'Parâmetros: {params}, F1: {average_score}')
 
     return average_score
 
@@ -103,12 +145,10 @@ X_train = load_npz(f'{train_folder}/X_train.npz')
 X_train = X_train.tocsc()
 labels = np.load(f'{train_folder}/y_train.npy', allow_pickle=True)
 
-with open(vocabulary_file, 'r') as file:
-    vocabulary = json.load(file)
-selected_features_indices = list(vocabulary.values())
+n_components = 100  # Ajuste conforme necessário
 
-# Selecionar características com base no vocabulário
-transformed_train = X_train[:, selected_features_indices]
+U, Sigma, VT = randomized_svd(X_train, n_components=n_components)
+transformed_train = U * Sigma
 
 sampler = optuna.samplers.TPESampler(seed=42)
 pruner = optuna.pruners.HyperbandPruner()

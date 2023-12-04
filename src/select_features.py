@@ -5,38 +5,61 @@ import json
 from scipy.sparse import load_npz, save_npz, csr_matrix, vstack
 from sklearn.metrics.pairwise import cosine_distances
 
-def select_features_parallel(matrix, classes_array, word_dict, min_perct_inclass, max_perct_outclass):
+def calculate_intra_class_frequencies(matrix, classes_array):
     if not isinstance(matrix, csr_matrix):
         raise ValueError("A matriz fornecida deve ser do tipo csr_matrix.")
 
     unique_classes = np.unique(classes_array)
-    selected_features = []
-    selected_words_dict = {}
+    num_features = matrix.shape[1]
+    intra_class_frequencies = np.zeros((len(unique_classes), num_features))
 
     # A matriz de presença de features é calculada diretamente sobre a matriz esparsa
     feature_presence = matrix > 0
 
-    for class_value in unique_classes:
+    for class_idx, class_value in enumerate(unique_classes):
         in_class_indices = classes_array == class_value
-        out_class_indices = ~in_class_indices
+        
+        # Calcula a frequência da feature na classe atual
+        percent_in_class = feature_presence[in_class_indices].mean(axis=0).A1  # Converte para NumPy array unidimensional
+        intra_class_frequencies[class_idx, :] = percent_in_class
 
-        # As operações abaixo são otimizadas para matrizes esparsas
-        percent_in_class = feature_presence[in_class_indices].mean(axis=0).A  # Converte para NumPy array
-        percent_out_class = feature_presence[out_class_indices].mean(axis=0).A  # Converte para NumPy array
+    return intra_class_frequencies
 
-        # A operação de comparação é vetorizada
-        mask = (percent_in_class >= min_perct_inclass) & (percent_out_class <= max_perct_outclass)
-        mask = mask.ravel()  # Transforma em um array unidimensional
+def select_features(importance_matrix, word_dict, min_intra_class_freq, min_exclusivity):
+    num_classes, num_features = importance_matrix.shape
+    selected_features = []
 
-        for word, idx in word_dict.items():
-            if mask[idx]:
-                selected_features.append(idx)
-                selected_words_dict[word] = idx
+    # Calcula a importância de cada feature para cada classe
+    for feature_idx in range(num_features):
+        feature_freqs = importance_matrix[:, feature_idx]
 
-    # Utiliza indexação avançada 
-    # para criar a matriz reduzida
-    reduced_matrix = matrix[:, selected_features]
-    return reduced_matrix, selected_features, selected_words_dict
+        # Calcula a frequência média da feature nas outras classes
+        avg_freq_other_classes = (np.sum(feature_freqs) - feature_freqs) / (num_classes - 1)
+
+        # Calcula a exclusividade da feature
+        exclusivity = 1 - avg_freq_other_classes
+
+        selected_words_dict = {}
+        
+        # Verifica se a feature é suficientemente frequente e exclusiva em alguma classe
+        if np.any(feature_freqs >= min_intra_class_freq) and np.any(exclusivity >= min_exclusivity):
+            selected_features.append(feature_idx)
+
+    for word, idx in word_dict.items():
+        if idx in selected_features:
+            selected_words_dict[word] = idx
+
+    return selected_features, selected_words_dict
+
+def select_features_parallel(matrix, classes_array, word_dict, min_intra_class_freq, min_exclusivity):
+    intra_class_frequencies = calculate_intra_class_frequencies(matrix, classes_array)
+
+    # min_intra_class_freq = 0.6  # Frequência mínima dentro da classe
+    # min_exclusivity = 0.7  # Medida mínima de exclusividade
+    features_to_keep, selected_words_dict = select_features(intra_class_frequencies, word_dict, min_intra_class_freq, min_exclusivity)
+
+    reduced_matrix = matrix[:, features_to_keep]
+    return reduced_matrix, features_to_keep, selected_words_dict
 
 def split_train_test(tfidf_matrix, labels, test_size=0.25): 
     X_train, X_test, y_train, y_test = train_test_split(tfidf_matrix, labels, stratify=labels, test_size=test_size, random_state=42)
@@ -82,13 +105,13 @@ def most_distants_docs():
     return vstack(most_distant_docs), labels_output, indices_output
 
 # Carregando dados e rótulos
-vectorized_file = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary.json'
+vectorized_file = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna_test.npz'
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary_test.json'
 output_folder = '/home/gssilva/datasets/atribuna-elias/full/selection'
-min_inclass = 0.60
+min_inclass = 0.50
 max_inclass = 1.05
-min_outclass = 0.20
-max_outclass = 0.45
+min_outclass = 0.45
+max_outclass = 0.80
 path_file_labels = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
 train_folder = '/home/gssilva/datasets/atribuna-elias/full/train-test'
 labels_column = 'LABEL'
@@ -97,6 +120,10 @@ distants = False
 
 vectorized = load_npz(vectorized_file)
 df = pd.read_csv(path_file_labels)
+
+labels_to_keep = [label for label, count in df['LABEL'].value_counts().items() if count > 4000]
+df = df[df['LABEL'].isin(labels_to_keep)]
+
 labels = df[labels_column].to_numpy()  # Convertendo para NumPy array3
 labels_uniq = set(labels)
 
@@ -123,7 +150,6 @@ if distants:
             y_train = np.append(y_train, labels_distants[idx])
 
 
-
 # Salvando matrizes e rótulos divididos
 save_npz(f'{train_folder}/X_train.npz', X_train)
 save_npz(f'{train_folder}/X_test.npz', X_test)
@@ -135,6 +161,9 @@ print("Divisão Treino e Teste realizada!")
 for i in np.arange(min_inclass, max_inclass, 0.05):  # Ajuste o passo conforme necessário
     for j in np.arange(min_outclass, max_outclass, 0.05):  # Ajuste o passo conforme necessário
         _, __, new_vocabulary = select_features_parallel(X_train, y_train, vocabulary, i, j)
-        file_name = f'{output_folder}/vocabulary_{i:.2f}-{j:.2f}_not_centroid.json'.replace("'", "")
+        
+        print(f'- in:{i};\tout:{j};\tlen:{len(new_vocabulary.keys())}')
+        
+        file_name = f'{output_folder}/vocabulary_{i:.2f}-{j:.2f}_matrix_frequencia_test.json'.replace("'", "")
         with open(file_name, 'w') as file:
             json.dump(new_vocabulary, file, indent=4)

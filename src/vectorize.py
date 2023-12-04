@@ -15,12 +15,16 @@ def vectorize_tfidf(df):
 
 # Localização dos arquivos
 origin_csv_file = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
-output_file_name = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary.json'
+output_file_name = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna_test.npz'
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary_test.json'
 
 # Leitura do arquivo CSV
 df = pd.read_csv(origin_csv_file)
 print('DataFrame obtido do CSV')
+
+labels_to_keep = [label for label, count in df['LABEL'].value_counts().items() if count > 4000]
+
+df = df[df['LABEL'].isin(labels_to_keep)]
 
 # Vetorização TF-IDF
 vocabulary, tfidf_matrix_sparse = vectorize_tfidf(df)
