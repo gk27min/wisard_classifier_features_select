@@ -24,6 +24,18 @@ fixed_train = []
 
 random.seed(random_state)
 
+vectorized_file = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
+vectorized_file_out = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna_svd100.npz'
+vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/selection/vocabulary_0.60-0.75_matrix_frequencia.json'
+path_file_labels = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
+output_img = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/full_discriminators_svd100.png'
+
+vectorized = load_npz(vectorized_file)
+df = pd.read_csv(path_file_labels)
+labels = df[labels_column].to_numpy()  # Convertendo para NumPy array3
+labels_uniq = df[labels_column].unique()
+labels_uniq.sort()
+
 def remove_documents_by_classes(class_list, csr_matrix, label_vector):
     # Crie um conjunto das classes a serem removidas para verificar a pertinência
     classes_to_remove = set(class_list)
@@ -43,107 +55,6 @@ def remove_documents_by_classes(class_list, csr_matrix, label_vector):
     label_vector_filtered = np.array(labels_to_keep)
 
     return csr_matrix_filtered, label_vector_filtered
-
-def select_train_base(labels, matrix, fixed_indices=None):
-    indices_train = []
-    indices_test = []
-    labels_unique, counts = np.unique(labels, return_counts=True)
-
-    for label, num_docs in zip(labels_unique, counts):
-        # Define a porcentagem de treino baseada no número de documentos
-        if num_docs < 300:
-            percent_train = 0.90
-        elif num_docs < 500:
-            percent_train = 0.80
-        elif num_docs < 1500:
-            percent_train = 0.70
-        elif num_docs < 2000:
-            percent_train = 0.60
-        else:
-            percent_train = 0.50
-        
-        # Encontra os índices para a classe atual
-        class_indices = np.where(labels == label)[0]
-
-        # Divide os índices para treino e teste
-        train_indices, test_indices = train_test_split(class_indices, train_size=percent_train)
-        
-        if fixed_indices is not None:
-            # Adicione os índices fixos à lista de índices de treinamento
-            train_indices = list(set(train_indices) | set(fixed_indices))
-        
-        indices_train.extend(train_indices)
-        indices_test.extend(test_indices)
-
-    X_train = [matrix[i] for i in indices_train]
-    X_test = [matrix[i] for i in indices_test]
-
-    y_train = [labels[i] for i in indices_train]
-    y_test = [labels[i] for i in indices_test]
-
-    return X_train, X_test, y_train, y_test
-
-def centroid_calc(vectorized_):
-    centroids = {}
-    for label in set(labels_uniq):
-        # Índices dos documentos que pertencem a esta classe
-        indices = [i for i, l in enumerate(labels) if l == label]
-        
-        # Calculando a média dos vetores TF-IDF para esses documentos
-        centroids[label] = np.mean(vectorized_[indices], axis=0)
-    
-    # Converta os valores do dicionário para uma matriz
-    centroid_matrix = np.array(list(centroids.values()))
-    
-    return csr_matrix(centroid_matrix), list(centroids.keys())
-
-def most_distants_docs(vectorized_):
-    most_distant_indices = []
-
-    for label in set(labels):
-        indices = [i for i, l in enumerate(labels) if l == label]
-
-        # Calcular as distâncias de cosseno entre os documentos
-        distances = cosine_distances(vectorized_[indices])
-
-        # Binarizar as distâncias (manter apenas 0s e 1s)
-        binary_distances = np.where(distances > 0, 1, 0)
-
-        # Encontrar os índices dos documentos mais distantes (10)
-        num_docs_to_select = 10
-        selected_indices = np.argsort(binary_distances.sum(axis=1))[-num_docs_to_select:]
-
-        # Mapear os índices selecionados de volta para os índices originais
-        selected_indices = [indices[i] for i in selected_indices]
-
-        # Adicionar os índices dos documentos mais distantes à lista
-        most_distant_indices.extend(selected_indices)
-
-    return most_distant_indices
-
-def most_close_docs(vectorized_):
-    most_close_indices = []
-
-    for label in set(labels):
-        indices = [i for i, l in enumerate(labels) if l == label]
-
-        # Calcular as distâncias de cosseno entre os documentos
-        distances = cosine_distances(vectorized_[indices])
-
-        # Binarizar as distâncias (manter apenas 0s e 1s)
-        binary_distances = np.where(distances > 0, 1, 0)
-
-        # Encontrar os índices dos documentos mais próximos (10)
-        num_docs_to_select = 10
-        selected_indices = np.argsort(binary_distances.sum(axis=1))[:num_docs_to_select]
-
-        # Mapear os índices selecionados de volta para os índices originais
-        selected_indices = [indices[i] for i in selected_indices]
-
-        # Adicionar os índices dos documentos mais próximos à lista
-        most_close_indices.extend(selected_indices)
-
-    return most_close_indices
 
 def binarize_vectorized(thermometer, X):
 
@@ -268,17 +179,6 @@ def generate_heatmap(data, file_name):
     plt.savefig(file_name)
     plt.close()
 
-vectorized_file = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna.npz'
-vectorized_file_out = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna_svd100.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/selection/vocabulary_0.60-0.75_matrix_frequencia.json'
-path_file_labels = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
-output_img = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/full_discriminators_svd100.png'
-
-vectorized = load_npz(vectorized_file)
-df = pd.read_csv(path_file_labels)
-labels = df[labels_column].to_numpy()  # Convertendo para NumPy array3
-labels_uniq = df[labels_column].unique()
-labels_uniq.sort()
 
 print('Getting all inicial files and selecting all features...')
 
@@ -307,28 +207,8 @@ plt.savefig('/home/gssilva/datasets/atribuna-elias/full/results/imagens/svd100.p
 plt.close()
 print('Aply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
 
-if centroid_cal:
-    centroids, labels_centroids = centroid_calc(vectorized_reduced)
-    centroids_bin = binarize_vectorized(params['thermometer'], centroids)
-    print('Centroids calculate....')
-
-if most_dist:
-    indices = most_distants_docs(vectorized_reduced)
-    fixed_train.extend(indices)
-    print('Most distantes calculate....')
-
-if most_close:
-    indices = most_close_docs(vectorized_reduced)
-    fixed_train.extend(indices)
-    print('Most close documents calculate...')
-
 bin_x = binarize_vectorized(params['thermometer'], vectorized_reduced)
 bin_train, bin_test, y_train, y_test = select_train_base(labels, bin_x, fixed_train)
-
-if centroid_cal:
-    bin_train.extend(centroids_bin)
-    y_train = list(y_train)
-    y_train.extend(labels_centroids)
 
 print('binarized and split all data done...')
 
