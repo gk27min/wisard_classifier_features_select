@@ -1,40 +1,40 @@
 import pandas as pd
-import json
 from scipy.sparse import save_npz
 from sklearn.feature_extraction.text import TfidfVectorizer
+import argparse
 
-column_text = 'ABSTRACT'
+# Constantes
+DEFAULT_COLUMN_TEXT = 'ABSTRACT'
+DEFAULT_CSV_FILE = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
+DEFAULT_OUTPUT_FILE = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna_test.npz'
 
-def vectorize_tfidf(df):
-    if column_text in df.columns:
+def vectorize_tfidf(df, column):
+    if column in df.columns:
         tfidf_vectorizer = TfidfVectorizer()
-        tfidf_matrix = tfidf_vectorizer.fit_transform(df[column_text])
+        tfidf_matrix = tfidf_vectorizer.fit_transform(df[column])
         return tfidf_vectorizer.vocabulary_, tfidf_matrix
     else:
-        raise ValueError(f"A coluna {column_text} não está presente no DataFrame.")
+        raise ValueError(f"A coluna {column} não está presente no DataFrame.")
 
-# Localização dos arquivos
-origin_csv_file = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
-output_file_name = '/home/gssilva/datasets/atribuna-elias/full/vectorized_aTribuna_test.npz'
-vocabulary_file = '/home/gssilva/datasets/atribuna-elias/full/vocabulary_test.json'
+def main():
+    # Argumentos da linha de comando
+    parser = argparse.ArgumentParser(description='Vetorização TF-IDF de um arquivo CSV.')
+    parser.add_argument('--csv_file', type=str, default=DEFAULT_CSV_FILE, help='Caminho para o arquivo CSV de entrada.')
+    parser.add_argument('--output_file', type=str, default=DEFAULT_OUTPUT_FILE, help='Caminho para o arquivo de saída da matriz TF-IDF.')
+    parser.add_argument('--column_text', type=str, default=DEFAULT_COLUMN_TEXT, help='Nome da coluna que contém o texto a ser vetorizado.')
+    args = parser.parse_args()
 
-# Leitura do arquivo CSV
-df = pd.read_csv(origin_csv_file)
-print('DataFrame obtido do CSV')
+    # Leitura do arquivo CSV
+    df = pd.read_csv(args.csv_file)
+    print('DataFrame obtido do CSV')
 
-labels_to_keep = [label for label, count in df['LABEL'].value_counts().items() if count > 4000]
+    # Vetorização TF-IDF
+    vocabulary, tfidf_matrix = vectorize_tfidf(df, args.column_text)
+    print("Vetorização TF-IDF concluída")
 
-df = df[df['LABEL'].isin(labels_to_keep)]
+    # Salvando a matriz TF-IDF esparsa
+    save_npz(args.output_file, tfidf_matrix)
+    print("Matriz TF-IDF esparsa salva")
 
-# Vetorização TF-IDF
-vocabulary, tfidf_matrix_sparse = vectorize_tfidf(df)
-print("Vetorização TF-IDF concluída")
-
-# Salvando o vocabulário
-with open(vocabulary_file, 'w') as f:
-    json.dump(vocabulary, f)
-print("Vocabulário salvo")
-
-# Salvando a matriz TF-IDF esparsa
-save_npz(output_file_name, tfidf_matrix_sparse)
-print("Matriz TF-IDF esparsa salva")
+if __name__ == "__main__":
+    main()

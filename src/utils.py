@@ -1,29 +1,11 @@
-import random
-import wisardpkg as wsd
-import pandas as pd
 import numpy as np
-import scipy.sparse as sp
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.sparse import load_npz
-from sklearn.model_selection import train_test_split
 from sklearn.utils.extmath import randomized_svd
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, 
-    f1_score, hamming_loss, classification_report
+    f1_score
 )
-from classifiers_algoritms import WisardClassifier, SVMClassifier, KNNClassifier
-
-# Constantes e Parâmetros
-RANDOM_STATE = 42
-LABELS_COLUMN = 'LABEL'
-DATA_FILE = '/home/gssilva/datasets/atribuna-elias/full/vect_aTribuna.npz'
-LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
-IMG_DISC = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/full_discriminators_svd100.png'
-IMG_SVD = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/svd100.png'
-N_COMPONENTS = 100
-
-random.seed(RANDOM_STATE)
 
 def evaluate_classification(predicted, expected):
     accuracy = accuracy_score(expected, predicted)
@@ -85,45 +67,19 @@ def generate_heatmap(data, file_name):
     plt.savefig(file_name)
     plt.close()
 
-def aply_svd(data, n_compts: int, img: str):
+def apply_svd(data, n_compts: int, img: str, gerete_img : bool):
     U, Sigma, VT = randomized_svd(data, n_components=n_compts)
     data = U * Sigma
 
-    total_variance = np.sum(Sigma**2)
-    explained_variance_ratio = (Sigma**2) / total_variance
+    if gerete_img:
+        total_variance = np.sum(Sigma**2)
+        explained_variance_ratio = (Sigma**2) / total_variance
 
-    plt.plot(explained_variance_ratio)
-    plt.title('Explained Variance Ratio of SVD')
-    plt.xlabel('Component Number')
-    plt.ylabel('Explained Variance Ratio')
-    plt.tight_layout()
-    plt.savefig(img)
-    plt.close()
+        plt.plot(explained_variance_ratio)
+        plt.title('Explained Variance Ratio of SVD')
+        plt.xlabel('Component Number')
+        plt.ylabel('Explained Variance Ratio')
+        plt.tight_layout()
+        plt.savefig(img)
+        plt.close()
     return data
-
-data = load_npz(DATA_FILE)
-labels = pd.read_csv(LABELS_FILE)[LABELS_COLUMN].to_numpy()
-labels_unique = np.sort(np.unique(labels))
-
-X_train, X_test, y_train, y_test = train_test_split(data, labels, stratify=labels, test_size=0.25, random_state=RANDOM_STATE)
-
-print('split train/test data...')
-print(f'Aply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
-
-X_train = aply_svd(X_train, N_COMPONENTS, IMG_SVD)
-
-models = {
-    'SVM': SVMClassifier(kernel='rbf', C=10, gamma='scale'),
-    'KNN': KNNClassifier(n_neighbors=7, weights='uniform', algorithm='auto'),
-    'Wisard': WisardClassifier(ram=62, min_score=0.5, threshold=1000, discriminator_limit=5)
-}
-
-for model_name, model in models.items():
-    model.fit(X_train, y_train)
-    predition = model.predict(X_test)
-    if isinstance(model, WisardClassifier):
-        discriminators = model.getMentalImages()
-        generate_heatmap(discriminators, IMG_DISC)
-        print('Discriminators Images done....')
-    print(f"{model_name} predictions:")
-    print(classification_report(y_test, predition, target_names=labels_unique))

@@ -1,0 +1,9 @@
+wisardpkg
+pandas
+nltk
+scipy
+scikit-learn
+numpy
+optuna
+matplotlib
+seaborn
