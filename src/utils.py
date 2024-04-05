@@ -71,7 +71,7 @@ def apply_svd(data, n_compts: int, img: str, gerete_img : bool):
     U, Sigma, VT = randomized_svd(data, n_components=n_compts)
     data = U * Sigma
 
-    if gerete_img:
+    if gerete_img == True:
         total_variance = np.sum(Sigma**2)
         explained_variance_ratio = (Sigma**2) / total_variance
 

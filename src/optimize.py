@@ -5,13 +5,12 @@ from sklearn.model_selection import KFold, GridSearchCV
 from scipy.sparse import load_npz
 from utils import apply_svd
 from classifiers_algoritms import WisardClassifier, SVMClassifier, KNNClassifier
-import argparse
 
 # Constantes e Parâmetros
 DEFAULT_RANDOM_STATE = 42
 DEFAULT_LABELS_COLUMN = 'LABEL'
-DEFAULT_DATA_FILE = '/home/gssilva/datasets/atribuna-elias/full/vect_aTribuna.npz'
-DEFAULT_LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
+DEFAULT_DATA_FILE = '/home/gssilva/datasets/atribuna-elias/bin/bin_62.npz'
+DEFAULT_LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribuna.csv'
 DEFAULT_N_TRIALS = 100
 DEFAULT_N_SPLITS = 5
 DEFAULT_N_COMPONENTS = 100
@@ -44,13 +43,8 @@ def split_data_with_cross_validation(data, labels):
             for train_index, test_index in kf.split(data)]
 
 def main():
-    parser = argparse.ArgumentParser(description='Optimization of machine learning classifiers.')
-    parser.add_argument('--data_file', type=str, default=DEFAULT_DATA_FILE, help='Path to the data file.')
-    parser.add_argument('--labels_file', type=str, default=DEFAULT_LABELS_FILE, help='Path to the labels file.')
-    args = parser.parse_args()
-
-    data = load_npz(args.data_file)
-    df = pd.read_csv(args.labels_file)
+    data = load_npz(DEFAULT_DATA_FILE)
+    df = pd.read_csv(DEFAULT_LABELS_FILE)
     labels = df[DEFAULT_LABELS_COLUMN].to_numpy()
 
     train_test_splits = split_data_with_cross_validation(data, labels)
@@ -61,8 +55,8 @@ def main():
     knn_params_grid = {'n_neighbors': [3, 5, 7], 'weights': ['uniform', 'distance'], 'algorithm': ['auto', 'brute']}
     knn_params_optuna = {'n_neighbors': (3, 10), 'weights': ['uniform', 'distance'], 'algorithm': ['auto', 'brute']}
 
-    wisard_params_grid = {'ram': [50, 100, 200], 'min_score': [0.3, 0.5, 0.7], 'threshold': [0.05, 0.1, 0.2], 'discriminator_limit': [5, 10, 15]}
-    wisard_params_optuna = {'ram': (50, 200), 'min_score': (0.3, 0.7), 'threshold': (0.05, 0.2), 'discriminator_limit': (5, 15)}
+    wisard_params_grid = {'ram': [4, 8, 16, 24, 32, 40, 62, 64], 'min_score': [0.3, 0.5, 0.7], 'threshold': [0.05, 0.1, 0.2, 1000], 'discriminator_limit': [5, 10, 15]}
+    wisard_params_optuna = {'ram': (4, 64), 'min_score': (0.3, 0.7), 'threshold': (0.05, 0.2), 'discriminator_limit': (5, 15)}
 
     models = {
         'SVM': SVMClassifier(),
@@ -72,17 +66,21 @@ def main():
 
     best_params = {model_name: {'GridSearch': [], 'Optuna': []} for model_name in models.keys()}
 
-    for model_name, model in models.items():
-        for (train_data, train_labels), (test_data, _) in train_test_splits:
-            train_data_transformed, _ = apply_svd(train_data, test_data, DEFAULT_N_COMPONENTS, gerete_img=False)
-            best_params[model_name]['GridSearch'].append(optimize_with_gridsearch(model, eval(f"{model_name.lower()}_params_grid"), train_data_transformed, train_labels))
-            best_params[model_name]['Optuna'].append(optimize_with_optuna(model, eval(f"{model_name.lower()}_params_optuna"), train_data_transformed, train_labels))
+    # for model_name, model in models.items():
+    for (train_data, train_labels), (test_data, _) in train_test_splits:
+        train_data_transformed = apply_svd(train_data, DEFAULT_N_COMPONENTS, _, gerete_img=False)
+        best_params['SVM']['GridSearch'].append(optimize_with_gridsearch(SVMClassifier(), eval(f"{'SVM'.lower()}_params_grid"), train_data_transformed, train_labels))
+        best_params['SVM']['Optuna'].append(optimize_with_optuna(SVMClassifier(), eval(f"{'SVM'.lower()}_params_optuna"), train_data_transformed, train_labels))
 
-    for model_name, params in best_params.items():
-        print(f"Best {model_name} params:")
-        print(f"GridSearch: {params['GridSearch']}")
-        print(f"Optuna: {params['Optuna']}")
-        print('-' * 50)
+    # for model_name, params in best_params.items():
+    #     print(f"Best {model_name} params:")
+    #     print(f"GridSearch: {params['GridSearch']}")
+    #     print(f"Optuna: {params['Optuna']}")
+    #     print('-' * 50)
+    print(f"Best {'SVM'} params:")
+    print(f"GridSearch: {best_params['GridSearch']}")
+    print(f"Optuna: {best_params['Optuna']}")
+    print('-' * 50)
 
 if __name__ == "__main__":
     main()

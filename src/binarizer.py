@@ -1,56 +1,55 @@
-import argparse
 import wisardpkg as wsd
 import scipy.sparse as sp
 import numpy as np
-from scipy.sparse import load_npz, save_npz
+from scipy.sparse import lil_matrix, save_npz, load_npz
+
+DEFAULT_THERM = 62
+DEFAULT_DATA_FILE = '/home/gssilva/datasets/atribuna-elias/vectorized_aTribuna.npz'
+DEFAULT_BIN_FILE = '/home/gssilva/datasets/atribuna-elias/bin/bin_62.npz'
+DEFAULT_METHOD = 'thermometer'
 
 def thermometer_binarize(thermometer, X):
+    print("Binarizando os dados usando termômetros dinâmicos...")
     num_features = X.shape[1]
     thermometer_sizes = [thermometer] * num_features
 
-    # Converter para formato denso se X for uma matriz esparsa
-    if sp.issparse(X):
-        X = X.toarray()
+    mins = np.min(X, axis=0).A.flatten()
+    maxs = np.max(X, axis=0).A.flatten()
 
-    mins = np.min(X, axis=0)
-    maxs = np.max(X, axis=0)
+    bin_values = sp.lil_matrix(X.shape, dtype=np.int8)
 
-    dtherm = wsd.DynamicThermometer(thermometer_sizes, mins, maxs)
+    for i, row in enumerate(X):
+        values = ((row.data - mins[row.indices]) / (maxs[row.indices] - mins[row.indices]) * thermometer).astype(np.int8)
+        bin_values[i, row.indices] = values
 
-    # Aplica a transformação em todo o conjunto de dados de uma vez
-    binX = [dtherm.transform(X[i]) for i in range(len(X))]
-    return binX
+    return bin_values
+
 
 def binary_binarize(X):
+    print("Binarizando os dados usando codificação binária...")
     binarized_data = []
     for row in X:
-        # Verifica se cada valor na linha é maior que zero e converte para int (0 ou 1)
         binarized_row = [int(value > 0) for value in row.data]
         binarized_data.append(binarized_row)
     return binarized_data
 
-def main():
-    # Argumentos da linha de comando
-    parser = argparse.ArgumentParser(description='Binarização de dados usando termômetros dinâmicos.')
-    parser.add_argument('--therm', type=int, default=62, help='Tamanho do termômetro.')
-    parser.add_argument('--data_file', type=str, default='/home/gssilva/datasets/atribuna-elias/full/vect_aTribuna.npz', help='Caminho para o arquivo de dados.')
-    parser.add_argument('--bin_file', type=str, default='/home/gssilva/datasets/atribuna-elias/full/bin_aTribuna.npz', help='Caminho para o arquivo binarizado.')
-    parser.add_argument('--method', type=str, choices=['thermometer', 'binary'], default='thermometer', help='Método de binarização a ser usado (thermometer ou binary).')
-    args = parser.parse_args()
-
+def main(therm=DEFAULT_THERM, data_file=DEFAULT_DATA_FILE, bin_file=DEFAULT_BIN_FILE, method=DEFAULT_METHOD):
+    print(f"Carregando dados de {data_file}...")
     # Carregar dados
-    data = load_npz(args.data_file)
+    data = load_npz(data_file)
 
     # Binarizar dados
-    if args.method == 'thermometer':
-        binarized_data = thermometer_binarize(args.therm, data)
+    if method == 'thermometer':
+        binarized_data = thermometer_binarize(therm, data)
     else:
         binarized_data = binary_binarize(data)
 
-    # Salvar dados binarizados
-    save_npz(args.bin_file, binarized_data)
+    print(f"Salvando dados binarizados em {bin_file}...")
 
-    print(f"Dados binarizados salvos em {args.bin_file}")
+    binarized_data_csr = binarized_data.tocsr()
+    save_npz(bin_file, binarized_data_csr)
+
+    print(f"Dados binarizados salvos em {bin_file}")
 
 if __name__ == "__main__":
     main()

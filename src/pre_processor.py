@@ -5,11 +5,17 @@ import string
 from nltk.corpus import stopwords
 from nltk.stem import RSLPStemmer
 from concurrent.futures import ProcessPoolExecutor
-import argparse
 
-# Download de stopwords
+# Download de stopwords e rslp
 nltk.download('stopwords')
+nltk.download('rslp')
 STOP_WORDS_PT = set(stopwords.words('portuguese'))
+
+# Constantes
+CSV_FILE = '/home/gssilva/datasets/atribuna-elias/aTribuna.csv'
+OUTPUT_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribuna.csv'
+COLUMN_TEXT = 'ABSTRACT'
+N_PROCS = 4
 
 def clean_and_stem_text(text):
     if not isinstance(text, str):
@@ -39,23 +45,19 @@ def clean_and_stem_text_parallel(texts, num_workers=4):
     return results
 
 def main():
-    # Argumentos da linha de comando
-    parser = argparse.ArgumentParser(description='Preprocessamento de texto.')
-    parser.add_argument('--csv_file', type=str, default='/home/gssilva/datasets/atribuna-elias/aTribuna-Elias.csv', help='Caminho para o arquivo CSV de entrada.')
-    parser.add_argument('--output_file', type=str, default='/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv', help='Caminho para o arquivo CSV de saída.')
-    parser.add_argument('--n_procs', type=int, default=30, help='Número de processos para processamento paralelo.')
-    parser.add_argument('--column_text', type=str, default='ABSTRACT', help='Nome da coluna que contém o texto a ser processado.')
-    args = parser.parse_args()
+    try:
+        df = pd.read_csv(CSV_FILE, encoding="iso-8859-1")
+    except pd.errors.ParserError:
+        print(f"Error reading CSV file {CSV_FILE}. Check the file for inconsistencies.")
+        return
 
-    # Leitura do arquivo CSV
-    df = pd.read_csv(args.csv_file, encoding="iso-8859-1")
     print("dataset was collected!")
 
     # Limpeza e stemming do texto
-    df[args.column_text] = clean_and_stem_text_parallel(df[args.column_text], args.n_procs)
+    df[COLUMN_TEXT] = clean_and_stem_text_parallel(df[COLUMN_TEXT], N_PROCS)
 
     # Salvando o DataFrame processado
-    df.to_csv(args.output_file, index=False)
+    df.to_csv(OUTPUT_FILE, index=False)
     print("Done preprocessing!")
 
 if __name__ == "__main__":
