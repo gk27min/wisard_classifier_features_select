@@ -16,7 +16,7 @@ DEFAULT_N_SPLITS = 5
 DEFAULT_N_COMPONENTS = 100
 
 def optimize_with_gridsearch(model, params, train_data, train_labels):
-    grid_search = GridSearchCV(model, params, cv=DEFAULT_N_SPLITS, verbose=1, n_jobs=-1)
+    grid_search = GridSearchCV(model, params, cv=DEFAULT_N_SPLITS, verbose=1, n_jobs=80)
     grid_search.fit(train_data, train_labels)
     return grid_search.best_params_
 
@@ -66,21 +66,17 @@ def main():
 
     best_params = {model_name: {'GridSearch': [], 'Optuna': []} for model_name in models.keys()}
 
-    # for model_name, model in models.items():
-    for (train_data, train_labels), (test_data, _) in train_test_splits:
-        train_data_transformed = apply_svd(train_data, DEFAULT_N_COMPONENTS, _, gerete_img=False)
-        best_params['SVM']['GridSearch'].append(optimize_with_gridsearch(SVMClassifier(), eval(f"{'SVM'.lower()}_params_grid"), train_data_transformed, train_labels))
-        best_params['SVM']['Optuna'].append(optimize_with_optuna(SVMClassifier(), eval(f"{'SVM'.lower()}_params_optuna"), train_data_transformed, train_labels))
+    for model_name, model in models.items():
+        for (train_data, train_labels), (test_data, _) in train_test_splits:
+            train_data_transformed = apply_svd(train_data, DEFAULT_N_COMPONENTS, _, gerete_img=False)
+            best_params[model_name]['GridSearch'].append(optimize_with_gridsearch(model, eval(f"{model_name.lower()}_params_grid"), train_data_transformed, train_labels))
+            best_params[model_name]['Optuna'].append(optimize_with_optuna(model, eval(f"{model_name.lower()}_params_optuna"), train_data_transformed, train_labels))
 
-    # for model_name, params in best_params.items():
-    #     print(f"Best {model_name} params:")
-    #     print(f"GridSearch: {params['GridSearch']}")
-    #     print(f"Optuna: {params['Optuna']}")
-    #     print('-' * 50)
-    print(f"Best {'SVM'} params:")
-    print(f"GridSearch: {best_params['GridSearch']}")
-    print(f"Optuna: {best_params['Optuna']}")
-    print('-' * 50)
+    for model_name, params in best_params.items():
+        print(f"Best {model_name} params:")
+        print(f"GridSearch: {params['GridSearch']}")
+        print(f"Optuna: {params['Optuna']}")
+        print('-' * 50)
 
 if __name__ == "__main__":
     main()
