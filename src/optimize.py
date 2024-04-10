@@ -14,9 +14,10 @@ DEFAULT_LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribu
 DEFAULT_N_TRIALS = 100
 DEFAULT_N_SPLITS = 5
 DEFAULT_N_COMPONENTS = 100
+DEFAULT_N_JOBS = 80
 
 def optimize_with_gridsearch(model, params, train_data, train_labels):
-    grid_search = GridSearchCV(model, params, cv=DEFAULT_N_SPLITS, verbose=1, n_jobs=80)
+    grid_search = GridSearchCV(model, params, cv=DEFAULT_N_SPLITS, verbose=1, n_jobs=DEFAULT_N_JOBS)
     grid_search.fit(train_data, train_labels)
     return grid_search.best_params_
 
@@ -35,6 +36,23 @@ def optimize_with_optuna(model, params, train_data, train_labels):
 
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=DEFAULT_N_TRIALS)
+    return study.best_params
+
+def optimize_with_optuna_parallel(model, params, train_data, train_labels):
+    def objective(trial):
+        for param_name, param_range in params.items():
+            if isinstance(param_range[0], float):
+                setattr(model, param_name, trial.suggest_float(param_name, *param_range))
+            elif isinstance(param_range[0], int):
+                setattr(model, param_name, trial.suggest_int(param_name, *param_range))
+            else:
+                setattr(model, param_name, trial.suggest_categorical(param_name, param_range))
+
+        model.fit(train_data, train_labels)
+        return model.score(train_data, train_labels)
+
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=DEFAULT_N_TRIALS, n_jobs=DEFAULT_N_JOBS)
     return study.best_params
 
 def split_data_with_cross_validation(data, labels):
@@ -70,7 +88,7 @@ def main():
         for (train_data, train_labels), (test_data, _) in train_test_splits:
             train_data_transformed = apply_svd(train_data, DEFAULT_N_COMPONENTS, _, gerete_img=False)
             best_params[model_name]['GridSearch'].append(optimize_with_gridsearch(model, eval(f"{model_name.lower()}_params_grid"), train_data_transformed, train_labels))
-            best_params[model_name]['Optuna'].append(optimize_with_optuna(model, eval(f"{model_name.lower()}_params_optuna"), train_data_transformed, train_labels))
+            best_params[model_name]['Optuna'].append(optimize_with_optuna_parallel(model, eval(f"{model_name.lower()}_params_optuna"), train_data_transformed, train_labels))
 
     for model_name, params in best_params.items():
         print(f"Best {model_name} params:")
