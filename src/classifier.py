@@ -1,17 +1,9 @@
 import random
-import wisardpkg as wsd
 import pandas as pd
 import numpy as np
-import scipy.sparse as sp
-import seaborn as sns
-import matplotlib.pyplot as plt
+from utils import apply_svd, generate_heatmap, evaluate_classification
 from scipy.sparse import load_npz
 from sklearn.model_selection import train_test_split
-from sklearn.utils.extmath import randomized_svd
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, 
-    f1_score, hamming_loss, classification_report
-)
 from classifiers_algoritms import WisardClassifier, SVMClassifier, KNNClassifier
 
 # Constantes e Parâmetros
@@ -25,82 +17,6 @@ N_COMPONENTS = 100
 
 random.seed(RANDOM_STATE)
 
-def evaluate_classification(predicted, expected):
-    accuracy = accuracy_score(expected, predicted)
-    
-    precision_macro = precision_score(expected, predicted, average='macro')
-    recall_macro = recall_score(expected, predicted, average='macro')
-    f1_macro = f1_score(expected, predicted, average='macro')
-    
-    precision_micro = precision_score(expected, predicted, average='micro')
-    recall_micro = recall_score(expected, predicted, average='micro')
-    f1_micro = f1_score(expected, predicted, average='micro')
-    
-    precision_weighted = precision_score(expected, predicted, average='weighted')
-    recall_weighted = recall_score(expected, predicted, average='weighted')
-    f1_weighted = f1_score(expected, predicted, average='weighted')
-    
-    results = {
-        'Accuracy': accuracy,
-        
-        'Precision Macro': precision_macro,
-        'Recall Macro': recall_macro,
-        'F1 Score Macro': f1_macro,
-        
-        'Precision Micro': precision_micro,
-        'Recall Micro': recall_micro,
-        'F1 Score Micro': f1_micro,
-        
-        'Precision Weighted': precision_weighted,
-        'Recall Weighted': recall_weighted,
-        'F1 Score Weighted': f1_weighted,
-    }
-
-    return results
-
-def generate_heatmap(data, file_name):
-    mean_vectors = {category: np.mean(np.array(vectors), axis=0) for category, vectors in data.items()}
-    max_length = max(len(v) for v in mean_vectors.values())
-    elements_per_range = max_length // 10 + (max_length % 10 > 0)
-    
-    grouped_vectors = {
-        category: np.array([
-            np.mean(vector[i:i + elements_per_range])
-            for i in range(0, len(vector), elements_per_range)
-        ]) for category, vector in mean_vectors.items()
-    }
-    
-    grouped_matrix = np.array(list(grouped_vectors.values()))
-    normalized_matrix = (grouped_matrix - np.min(grouped_matrix)) / (np.max(grouped_matrix) - np.min(grouped_matrix))
-    
-    plt.figure(figsize=(20, 10))
-    sns.heatmap(normalized_matrix, cmap='Blues', annot=False, cbar_kws={'label': 'Average Activation Level'})
-    plt.yticks(ticks=np.arange(0.8, len(grouped_vectors)), labels=grouped_vectors.keys(), rotation=0)
-    x_labels = [f"[{i}, {min(i + elements_per_range - 1, max_length)}]" for i in range(0, max_length, elements_per_range)]
-    plt.xticks(ticks=np.arange(0.8, len(x_labels)), labels=x_labels, rotation=0)
-    plt.title('Heatmap of Average Directional Vector by Category')
-    plt.xlabel('Window Position in Vector')
-    plt.ylabel('Category')
-    plt.tight_layout()
-    plt.savefig(file_name)
-    plt.close()
-
-def aply_svd(data, n_compts: int, img: str):
-    U, Sigma, VT = randomized_svd(data, n_components=n_compts)
-    data = U * Sigma
-
-    total_variance = np.sum(Sigma**2)
-    explained_variance_ratio = (Sigma**2) / total_variance
-
-    plt.plot(explained_variance_ratio)
-    plt.title('Explained Variance Ratio of SVD')
-    plt.xlabel('Component Number')
-    plt.ylabel('Explained Variance Ratio')
-    plt.tight_layout()
-    plt.savefig(img)
-    plt.close()
-    return data
-
 data = load_npz(DATA_FILE)
 labels = pd.read_csv(LABELS_FILE)[LABELS_COLUMN].to_numpy()
 labels_unique = np.sort(np.unique(labels))
@@ -110,7 +26,7 @@ X_train, X_test, y_train, y_test = train_test_split(data, labels, stratify=label
 print('split train/test data...')
 print(f'Aply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
 
-X_train = aply_svd(X_train, N_COMPONENTS, IMG_SVD)
+X_train = apply_svd(X_train, N_COMPONENTS, IMG_SVD, True)
 
 models = {
     'SVM': SVMClassifier(kernel='rbf', C=10, gamma='scale'),
@@ -125,5 +41,5 @@ for model_name, model in models.items():
         discriminators = model.getMentalImages()
         generate_heatmap(discriminators, IMG_DISC)
         print('Discriminators Images done....')
-    print(f"{model_name} predictions:")
-    print(classification_report(y_test, predition, target_names=labels_unique))
+    print(f"{model_name} predictions:\n")
+    print(evaluate_classification(y_test, predition))

@@ -14,7 +14,7 @@ DEFAULT_LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribu
 DEFAULT_N_TRIALS = 100
 DEFAULT_N_SPLITS = 5
 DEFAULT_N_COMPONENTS = 100
-DEFAULT_N_JOBS = 80
+DEFAULT_N_JOBS = 10
 
 def optimize_with_gridsearch(model, params, train_data, train_labels):
     grid_search = GridSearchCV(model, params, cv=DEFAULT_N_SPLITS, verbose=1, n_jobs=DEFAULT_N_JOBS)
