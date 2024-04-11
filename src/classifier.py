@@ -9,24 +9,25 @@ from classifiers_algoritms import WisardClassifier, SVMClassifier, KNNClassifier
 # Constantes e Parâmetros
 RANDOM_STATE = 42
 LABELS_COLUMN = 'LABEL'
-DATA_FILE = '/home/gssilva/datasets/atribuna-elias/full/vect_aTribuna.npz'
-LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/full/preprocessed_aTribuna-Elias.csv'
-IMG_DISC = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/full_discriminators_svd100.png'
-IMG_SVD = '/home/gssilva/datasets/atribuna-elias/full/results/imagens/svd100.png'
+DATA_FILE = '/home/gssilva/datasets/atribuna-elias/bin/bin_62.npz'
+LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribuna.csv'
+IMG_DISC = '/home/gssilva/outputs/results/images/fiscriminators.png'
+IMG_SVD = '/home/gssilva/outputs/results/images/svd.png'
 N_COMPONENTS = 100
 
 random.seed(RANDOM_STATE)
 
 data = load_npz(DATA_FILE)
+print(data)
 labels = pd.read_csv(LABELS_FILE)[LABELS_COLUMN].to_numpy()
 labels_unique = np.sort(np.unique(labels))
 
-X_train, X_test, y_train, y_test = train_test_split(data, labels, stratify=labels, test_size=0.25, random_state=RANDOM_STATE)
-
-print('split train/test data...')
 print(f'Aply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
+data = apply_svd(data, N_COMPONENTS, IMG_SVD, True)
 
-X_train = apply_svd(X_train, N_COMPONENTS, IMG_SVD, True)
+X_train, X_test, y_train, y_test = train_test_split(data, labels, stratify=labels, test_size=0.25, random_state=RANDOM_STATE)
+print('split train/test data...')
+
 
 models = {
     'SVM': SVMClassifier(kernel='rbf', C=10, gamma='scale'),
@@ -41,5 +42,5 @@ for model_name, model in models.items():
         discriminators = model.getMentalImages()
         generate_heatmap(discriminators, IMG_DISC)
         print('Discriminators Images done....')
-    print(f"{model_name} predictions:\n")
+    print(f"\n{model_name} predictions:\n")
     print(evaluate_classification(y_test, predition))
