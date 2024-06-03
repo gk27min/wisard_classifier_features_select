@@ -8,22 +8,21 @@ DEFAULT_DATA_FILE = '/home/gssilva/datasets/atribuna-elias/vectorized_aTribuna.n
 DEFAULT_BIN_FILE = '/home/gssilva/datasets/atribuna-elias/bin/bin_62.npz'
 DEFAULT_METHOD = 'thermometer'
 
-def thermometer_binarize(thermometer, X):
+def thermometer_binarize(thermometer, X, size:int = 0):
+    if (size == 0): size = len(X)
     print("Binarizando os dados usando termômetros dinâmicos...")
     num_features = X.shape[1]
     thermometer_sizes = [thermometer] * num_features
 
-    mins = np.min(X, axis=0).A.flatten()
-    maxs = np.max(X, axis=0).A.flatten()
+    mins = np.min(X, axis=0).flatten()
+    maxs = np.max(X, axis=0).flatten()
 
-    bin_values = sp.lil_matrix(X.shape, dtype=np.int8)
+    bin_values = sp.lil_matrix(X.shape, dtype=np.float64)
 
-    for i, row in enumerate(X):
-        values = ((row.data - mins[row.indices]) / (maxs[row.indices] - mins[row.indices]) * thermometer).astype(np.int8)
-        bin_values[i, row.indices] = values
+    dtherm = wsd.DynamicThermometer(thermometer_sizes, mins, maxs)
+    bin_values = [dtherm.transform(X[i]) for i in range(size)]
 
     return bin_values
-
 
 def binary_binarize(X):
     print("Binarizando os dados usando codificação binária...")

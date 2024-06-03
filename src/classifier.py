@@ -4,12 +4,13 @@ import numpy as np
 from utils import apply_svd, generate_heatmap, evaluate_classification
 from scipy.sparse import load_npz
 from sklearn.model_selection import train_test_split
+from binarizer import thermometer_binarize
 from classifiers_algoritms import WisardClassifier, SVMClassifier, KNNClassifier
 
 # Constantes e Parâmetros
 RANDOM_STATE = 42
 LABELS_COLUMN = 'LABEL'
-DATA_FILE = '/home/gssilva/datasets/atribuna-elias/bin/bin_62.npz'
+DATA_FILE = '/home/gssilva/datasets/atribuna-elias/vectorized_aTribuna.npz'
 LABELS_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribuna.csv'
 IMG_DISC = '/home/gssilva/outputs/results/images/fiscriminators.png'
 IMG_SVD = '/home/gssilva/outputs/results/images/svd.png'
@@ -18,12 +19,13 @@ N_COMPONENTS = 100
 random.seed(RANDOM_STATE)
 
 data = load_npz(DATA_FILE)
-print(data)
 labels = pd.read_csv(LABELS_FILE)[LABELS_COLUMN].to_numpy()
 labels_unique = np.sort(np.unique(labels))
+data_size = (data.getnnz()) - 1
 
 print(f'Aply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
 data = apply_svd(data, N_COMPONENTS, IMG_SVD, True)
+data = thermometer_binarize(62, data, data_size)
 
 X_train, X_test, y_train, y_test = train_test_split(data, labels, stratify=labels, test_size=0.25, random_state=RANDOM_STATE)
 print('split train/test data...')
