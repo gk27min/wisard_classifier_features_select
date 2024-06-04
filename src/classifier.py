@@ -23,7 +23,7 @@ labels = pd.read_csv(LABELS_FILE)[LABELS_COLUMN].to_numpy()
 labels_unique = np.sort(np.unique(labels))
 data_size = (data.getnnz()) - 1
 
-print(f'Aply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
+print(f'Apply svd model on the data and save svd curve of \'Explained Variance Ratio of SVD\' ...')
 data = apply_svd(data, N_COMPONENTS, IMG_SVD, True)
 data = thermometer_binarize(62, data, data_size)
 
