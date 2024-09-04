@@ -1,6 +1,7 @@
 import pandas as pd
 import nltk
 import re
+import spacy
 import string
 from nltk.corpus import stopwords
 from nltk.stem import RSLPStemmer
@@ -10,6 +11,7 @@ from concurrent.futures import ProcessPoolExecutor
 nltk.download('stopwords')
 nltk.download('rslp')
 STOP_WORDS_PT = set(stopwords.words('portuguese'))
+nlp = spacy.load("pt_core_news_sm")
 
 # Constantes
 CSV_FILE = '/home/gssilva/datasets/atribuna-elias/aTribuna.csv'
@@ -17,6 +19,40 @@ OUTPUT_FILE = '/home/gssilva/datasets/atribuna-elias/preprocessed_aTribuna.csv'
 COLUMN_TEXT = 'ABSTRACT'
 N_PROCS = 4
 
+# Compilar expressões regulares fora da função
+pattern_tags = re.compile(r'<[^>]+>')
+pattern_dates = re.compile(r'\d{2}/\d{2}/\d{4}')
+pattern_numbers = re.compile(r'\d+')
+pattern_links = re.compile(r'http\S+')
+pattern_editoria = re.compile(r'Editoria:.*')
+pattern_data_publicacao = re.compile(r'Data da Publicação:.*')
+
+def clean_and_lemmatize_text_TJSP(text):
+    if not isinstance(text, str):
+        return ""
+    
+    # Manter apenas o texto a partir de "Vistos"
+    text = text.split('Vistos.', 1)[-1]
+    
+    # Remoção de padrões específicos
+    text = pattern_tags.sub('', text)
+    text = pattern_dates.sub('', text)  # datas
+    text = pattern_numbers.sub('', text)  # números
+    text = pattern_links.sub('', text)  # links
+    text = pattern_editoria.sub('', text)  # publicações notas
+    text = pattern_data_publicacao.sub('', text)
+    
+    # Remoção de pontuação
+    text = ''.join([char for char in text if char not in string.punctuation])
+    
+    # Processar o texto com spaCy
+    doc = nlp(text.lower())
+    
+    # Lematização, remoção de nomes próprios e stop words
+    lemmatized_text = ' '.join([token.lemma_ for token in doc if token.ent_type_ != 'PER' and not token.is_stop])
+    
+    return lemmatized_text
+    
 def clean_and_stem_text(text):
     if not isinstance(text, str):
         return ""
